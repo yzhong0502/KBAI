@@ -45,13 +45,13 @@ class Agent:
             if len(self.answers) == 0:
                 return -1
             if len(self.answers) == 1:
-                return self.answers[0]
+                return int(self.answers[0])
 
             # check the figures one by one depending on its problem type
             # get Ravens objects from each figure
             current_ans = '-1'
             current_score = 0
-            if len(self.answers) == 6:
+            if problem.problemType == '2x2':
                 # A B
                 # C ?
                 A = problem.figures['A']
@@ -67,7 +67,7 @@ class Agent:
                         current_score = score
                         current_ans = opt
                 return int(current_ans)
-            else:
+            else: # 3x3
                 # A B C
                 # D E F
                 # G H ?
@@ -110,11 +110,17 @@ class Agent:
                         d = num_A//num_B
                         if d == num_A/num_B and num_C//d == num_C/d:
                             nums_ans.append(num_C//d)
+            to_del = []
             for i in range(len(self.answers)):
                 option = self.answers[i]
                 num_opt = len(problem.figures[option].objects)
                 if num_opt not in nums_ans:
-                    del self.answers[i]
+                    to_del.append(option)
+            for d in to_del:
+                for j in range(len(self.answers)):
+                    if d == self.answers[j]:
+                        del self.answers[j]
+                        break
         # case 3x3
         else:
             num_A = len(problem.figures['A'].objects)
@@ -138,11 +144,18 @@ class Agent:
                 nums_ans.append(num_A+num_B+num_C-num_G-num_H)
             elif num_C == num_A+num_B and num_F == num_D+num_E:
                 nums_ans.append(num_G+num_H)
+
+            to_del = []
             for i in range(len(self.answers)):
                 option = self.answers[i]
                 num_opt = len(problem.figures[option].objects)
                 if num_opt not in nums_ans:
-                    del self.answers[i]
+                    to_del.append(option)
+            for d in to_del:
+                for j in range(len(self.answers)):
+                    if d == self.answers[j]:
+                        del self.answers[j]
+                        break
 
     # pair objects from different figure using the same key. The name is
     # based on dic_1 so the key of dic_2 will be updated
@@ -156,11 +169,11 @@ class Agent:
             obj_a = A.objects[name_a]
             name_b = pairs_ab[name_a]
             name_c = pairs_ac[name_a]
-            if name_c=='':
+            if name_c == '':
                 return score
             name_o = pairs_co[name_c]
             # obj_a is deleted in B
-            if name_b=='':
+            if name_b == '':
                 if name_c!='':
                     # obj_a is deleted in b so does option
                     if name_o=='':
@@ -168,16 +181,22 @@ class Agent:
                     # not deleted in option
                     else:
                         score-=5
-            else:
+            if name_b != '':
                 obj_b = B.objects[name_b]
                 obj_c = C.objects[name_c]
-                obj_opt = option.objects[name_o]
-                for key in obj_a.attributes:
-                    # attributes that not change weight 5
-                    if obj_a.attributes[key] == obj_b.attributes[key] and obj_c.attributes[key] == obj_opt.attributes[key]:
-                        score += 5
-                    if obj_a.attributes[key] != obj_b.attributes[key] and obj_a.attributes[key] == obj_c.attributes[key] and obj_b.attributes[key] == obj_opt.attributes[key]:
-                        score += 1
+                if name_o=='':
+                    score-=5
+                else:
+                    obj_opt = option.objects[name_o]
+                    for key in obj_a.attributes:
+                        # attributes that not change weight 5
+                        if key not in obj_c.attributes or key not in obj_b.attributes or key not in obj_opt.attributes:
+                            continue
+
+                        if obj_a.attributes[key] == obj_b.attributes[key] and obj_c.attributes[key] == obj_opt.attributes[key]:
+                            score += 5
+                        if obj_a.attributes[key] != obj_b.attributes[key] and obj_a.attributes[key] == obj_c.attributes[key] and obj_b.attributes[key] == obj_opt.attributes[key]:
+                            score += 1
         '''
         if len(A.objects) == 1 and len(B.objects) == 1 and len(A.objects) == 1:
             # no need to pair objects
@@ -228,8 +247,9 @@ class Agent:
         # link the objects which have the most same attributes
 
         if len(f1.objects)<=len(f2.objects):
-            objects_2 = f2.objects
+            objects_2 = f2.objects.copy()
             for obj_1 in f1.objects:
+                Obj_1 = f1.objects[obj_1]
                 n = 0 # num of same attributes
                 most = 0
                 most_2 = '' # name of obj_2 which has the most same attributes with obj_1
@@ -239,8 +259,11 @@ class Agent:
                     most_2 = list(objects_2.keys())[0]
                 else:
                     for obj_2 in objects_2:
-                        for key in obj_1.attributes:
-                            if obj_1.attributes[key] == obj_2.attributes[key]:
+                        Obj_2 = objects_2[obj_2]
+                        for key in Obj_1.attributes:
+                            if key not in Obj_2.attributes:
+                                continue
+                            elif Obj_1.attributes[key] == Obj_2.attributes[key]:
                                 # next round uncomment
                                 # if key == 'shape': n += 5 else:
                                 n += 1
@@ -251,8 +274,9 @@ class Agent:
                 del objects_2[most_2]
         else:
             re_pairs = {} # obj_2:obj_1
-            objects_1 = f1.objects
+            objects_1 = f1.objects.copy()
             for obj_2 in f2.objects:
+                Obj_2 = f2.objects[obj_2]
                 n = 0 # match score - next round consider
                 most = 0
                 most_1 = '' # name of obj_2 which has the most same attributes with obj_1
@@ -262,8 +286,11 @@ class Agent:
                     most_1 = list(objects_1.keys())[0]
                 else:
                     for obj_1 in objects_1:
-                        for key in obj_1.attributes:
-                            if obj_1.attributes[key] == obj_2.attributes[key]:
+                        Obj_1 = objects_1[obj_1]
+                        for key in Obj_1.attributes:
+                            if key not in Obj_2.attributes:
+                                continue
+                            elif Obj_1.attributes[key] == Obj_2.attributes[key]:
                                 # next round uncomment
                                 # if key == 'shape': n += 5 else:
                                 n += 1
