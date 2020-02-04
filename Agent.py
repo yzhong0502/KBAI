@@ -60,9 +60,9 @@ class Agent:
                 for opt in self.answers:
                     option = problem.figures[opt]
                     if len(A.objects)>=len(B.objects):
-                        score = Agent.compute_score(A, B, C, option)
+                        score = self.compute_score(A, B, C, option)
                     else:
-                        score = Agent.compute_score(B, A, option, C)
+                        score = self.compute_score(B, A, option, C)
                     if score > current_score:
                         current_score = score
                         current_ans = opt
@@ -82,9 +82,9 @@ class Agent:
                 for opt in self.answers:
                     option = problem.figures[opt]
                     if len(A.objects) >= len(C.objects):
-                        score = Agent.compute_score(A, C, G, option) # treat 3X3 as 2X2
+                        score = self.compute_score(A, C, G, option) # treat 3X3 as 2X2
                     else:
-                        score = Agent.compute_score(C, A, option, G)
+                        score = self.compute_score(C, A, option, G)
                     if score > current_score:
                         current_score = score
                         current_ans = opt
@@ -159,12 +159,11 @@ class Agent:
 
     # pair objects from different figure using the same key. The name is
     # based on dic_1 so the key of dic_2 will be updated
-    @staticmethod
-    def compute_score(A, B, C, option):# A>=B, C>=option
+    def compute_score(self, A, B, C, option):# A>=B, C>=option
         score = 0
-        pairs_ab = Agent.pair_objects(A, B)
-        pairs_co = Agent.pair_objects(C, option)
-        pairs_ac = Agent.pair_objects(A, C)
+        pairs_ab = self.pair_objects(A, B)
+        pairs_co = self.pair_objects(C, option)
+        pairs_ac = self.pair_objects(A, C)
         for name_a in pairs_ab:
             obj_a = A.objects[name_a]
             name_b = pairs_ab[name_a]
@@ -213,21 +212,20 @@ class Agent:
         '''
         return score
 
-    @staticmethod
-    def compute_score_3(A, B, C, D, E, F, G, H, option):
+    def compute_score_3(self, A, B, C, D, E, F, G, H, option):
         score = 0
         if len(C.objects) > len(B.objects) > len(A.objects):
-            pairs_cb = Agent.pair_objects(C, B)
-            pairs_ba = Agent.pair_objects(B, A)
+            pairs_cb = self.pair_objects(C, B)
+            pairs_ba = self.pair_objects(B, A)
             for name_c in pairs_cb:
                 name_b = pairs_cb[name_c]
 
-        pairs_ab = Agent.pair_objects(A, B)
-        pairs_bc = Agent.pair_objects(B, C)
-        pairs_ad = Agent.pair_objects(A, D)
-        pairs_dg = Agent.pair_objects(D, G)
-        pairs_gh = Agent.pair_objects(G, H)
-        pairs_ho = Agent.pair_objects(H, option)
+        pairs_ab = self.pair_objects(A, B)
+        pairs_bc = self.pair_objects(B, C)
+        pairs_ad = self.pair_objects(A, D)
+        pairs_dg = self.pair_objects(D, G)
+        pairs_gh = self.pair_objects(G, H)
+        pairs_ho = self.pair_objects(H, option)
         for name_a in pairs_ab:
             obj_a = A.objects[name_a]
             name_b = pairs_ab[name_a]
@@ -237,9 +235,8 @@ class Agent:
 
 
     # Link objects from f2 to f1
-    @staticmethod
-    def pair_objects(f1, f2): # return obj_name_1:obj_name_2 pairs. f1>=f2？
-        # f1 should have equal or more objects than f2？
+    def pair_objects(self, f1, f2): # return obj_name_1:obj_name_2 pairs. f1>=f2?
+        # f1 should have equal or more objects than f2?
         # return directly if there is only one object in each figure
         pairs = {}  # obj_1:obj_2
         if len(f1.objects) == len(f2.objects) == 1:
@@ -271,7 +268,8 @@ class Agent:
                             most = n
                             most_2 = obj_2
                 pairs[obj_1] = most_2
-                del objects_2[most_2]
+                if most_2 != '':
+                    del objects_2[most_2]
         else:
             re_pairs = {} # obj_2:obj_1
             objects_1 = f1.objects.copy()
