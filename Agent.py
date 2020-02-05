@@ -32,6 +32,35 @@ class Agent:
     # Make sure to return your answer *as an integer* at the end of Solve().
     # Returning your answer as a string may cause your program to crash.
     def Solve(self,problem):
+        '''
+        # debug
+        print(problem.name)
+        print(" A: ", )
+        for obj in problem.figures['A'].objects:
+            oo = problem.figures['A'].objects[obj]
+            print('    ', obj, ':')
+            for att in oo.attributes:
+                print('     ', att, ':', oo.attributes[att])
+        print(" B: ", )
+        for obj in problem.figures['B'].objects:
+            oo = problem.figures['B'].objects[obj]
+            print('    ', obj, ':')
+            for att in oo.attributes:
+                print('     ', att, ':', oo.attributes[att])
+        print(" C: ", )
+        for obj in problem.figures['C'].objects:
+            oo = problem.figures['C'].objects[obj]
+            print('    ', obj, ':')
+            for att in oo.attributes:
+                print('     ', att, ':', oo.attributes[att])
+        print(" 3: ", )
+        for obj in problem.figures['3'].objects:
+            oo = problem.figures['3'].objects[obj]
+            print('    ', obj, ':')
+            for att in oo.attributes:
+                print('     ', att, ':', oo.attributes[att])
+        '''
+        
         # check problem type
         if problem.problemType == '2x2':
             self.answers = ['1', '2', '3', '4', '5', '6']
@@ -99,22 +128,24 @@ class Agent:
             num_A = len(problem.figures['A'].objects)
             num_B = len(problem.figures['B'].objects)
             num_C = len(problem.figures['C'].objects)
-            nums_ans = []
+            nums_ans = 0
             k = num_A - num_B
             if k == 0:
-                nums_ans = [num_C]
+                nums_ans = num_C
             else:
-                nums_ans.append(num_C-k)
+                nums_ans = num_C-k
+                '''
                 if k > 0:
                     if  num_B != 0:
                         d = num_A//num_B
                         if d == num_A/num_B and num_C//d == num_C/d:
                             nums_ans.append(num_C//d)
+                '''
             to_del = []
             for i in range(len(self.answers)):
                 option = self.answers[i]
                 num_opt = len(problem.figures[option].objects)
-                if num_opt not in nums_ans:
+                if num_opt != nums_ans:
                     to_del.append(option)
             for d in to_del:
                 for j in range(len(self.answers)):
@@ -159,17 +190,21 @@ class Agent:
 
     # pair objects from different figure using the same key. The name is
     # based on dic_1 so the key of dic_2 will be updated
-    def compute_score(self, A, B, C, option):# A>=B, C>=option
+    def compute_score(self, A, B, C, option):# A>=B, C>=option,
         score = 0
         pairs_ab = self.pair_objects(A, B)
         pairs_co = self.pair_objects(C, option)
         pairs_ac = self.pair_objects(A, C)
+
+        # track objects in C that has paired with objects in A
+        paired_C = []
         for name_a in pairs_ab:
             obj_a = A.objects[name_a]
             name_b = pairs_ab[name_a]
             name_c = pairs_ac[name_a]
-            if name_c == '':
-                return score
+            if name_c == '': # A has C not
+                continue
+            paired_C.append(name_c)
             name_o = pairs_co[name_c]
             # obj_a is deleted in B
             if name_b == '':
@@ -191,11 +226,56 @@ class Agent:
                         # attributes that not change weight 5
                         if key not in obj_c.attributes or key not in obj_b.attributes or key not in obj_opt.attributes:
                             continue
-
                         if obj_a.attributes[key] == obj_b.attributes[key] and obj_c.attributes[key] == obj_opt.attributes[key]:
-                            score += 5
-                        if obj_a.attributes[key] != obj_b.attributes[key] and obj_a.attributes[key] == obj_c.attributes[key] and obj_b.attributes[key] == obj_opt.attributes[key]:
                             score += 1
+                        if obj_a.attributes[key] != obj_b.attributes[key]:
+                            if obj_a.attributes[key] == obj_c.attributes[key] and obj_b.attributes[key] == obj_opt.attributes[key]:
+                                score += 1
+                            if key == 'angle':
+                                # rotate
+                                if int(obj_a.attributes[key]) - int(obj_b.attributes[key]) == int(obj_c.attributes[key]) - int(obj_opt.attributes[key]):
+                                    score += 5
+                                # mirror
+                                else:
+                                    x = int(obj_a.attributes[key]) + int(obj_b.attributes[key])
+                                    y = int(obj_c.attributes[key]) + int(obj_opt.attributes[key])
+                                    if x == 180 and y == 540:
+                                        score += 5
+                            if key == 'inside' or 'above' or 'left-of':
+                                b = obj_b.attributes[key] # name of the object in B
+                                o = obj_opt.attributes[key] # name of the object in option
+                                a = '' # find paired b in A
+                                c = '' # find paired o in C
+                                for a in pairs_ab:
+                                    if pairs_ab[a] == b:
+                                        break
+                                for c in pairs_co:
+                                    if pairs_co[c] == o:
+                                        break
+                                if a == '' and c == '': # no in A neither should in C
+                                    score += 1
+                                if a != '' and c != '':
+                                    if pairs_ac[a] == c: # match
+                                        score += 5
+
+        # C has A not - keep not change in opt
+        for name_c in C.objects:
+            if name_c not in paired_C:
+                name_o = pairs_co[name_c]
+                if name_o == '': # c has option not
+                    score-=1
+                else:
+                    obj_c = C.objects[name_c]
+                    obj_opt = option.objects[name_o]
+                    score += 2 # assume not change first
+                    for att in obj_c.attributes:
+                        if att not in obj_opt.attributes:
+                            score -= 3 # changed
+                            break
+                        else:
+                            if obj_c.attributes[att] != obj_opt.attributes[att]:
+                                score -=3 # changed
+                                break
         '''
         if len(A.objects) == 1 and len(B.objects) == 1 and len(A.objects) == 1:
             # no need to pair objects
@@ -262,8 +342,10 @@ class Agent:
                                 continue
                             elif Obj_1.attributes[key] == Obj_2.attributes[key]:
                                 # next round uncomment
-                                # if key == 'shape': n += 5 else:
-                                n += 1
+                                if key == 'shape': # shape weights most
+                                    n += 5
+                                else:
+                                    n += 1
                         if n>most:
                             most = n
                             most_2 = obj_2
@@ -290,8 +372,10 @@ class Agent:
                                 continue
                             elif Obj_1.attributes[key] == Obj_2.attributes[key]:
                                 # next round uncomment
-                                # if key == 'shape': n += 5 else:
-                                n += 1
+                                if key == 'shape':
+                                    n += 5
+                                else:
+                                    n += 1
                         if n>most:
                             most = n
                             most_1 = obj_1
