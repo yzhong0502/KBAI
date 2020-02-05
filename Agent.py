@@ -60,7 +60,7 @@ class Agent:
             for att in oo.attributes:
                 print('     ', att, ':', oo.attributes[att])
         '''
-        
+
         # check problem type
         if problem.problemType == '2x2':
             self.answers = ['1', '2', '3', '4', '5', '6']
@@ -228,6 +228,8 @@ class Agent:
                             continue
                         if obj_a.attributes[key] == obj_b.attributes[key] and obj_c.attributes[key] == obj_opt.attributes[key]:
                             score += 1
+                        if obj_a.attributes[key] == obj_c.attributes[key] and obj_b.attributes[key] == obj_opt.attributes[key]:
+                            score += 1
                         if obj_a.attributes[key] != obj_b.attributes[key]:
                             if obj_a.attributes[key] == obj_c.attributes[key] and obj_b.attributes[key] == obj_opt.attributes[key]:
                                 score += 1
@@ -256,6 +258,23 @@ class Agent:
                                     score += 1
                                 if a != '' and c != '':
                                     if pairs_ac[a] == c: # match
+                                        score += 5
+                            if key == 'alignment':
+                                a = obj_a.attributes[key]
+                                b = obj_b.attributes[key]
+                                c = obj_c.attributes[key]
+                                o = obj_opt.attributes[key]
+                                if a == 'top-right' and b == 'top-left':
+                                    if c == 'bottom-right' and o == 'bottom-left':
+                                        score += 5
+                                if a == 'top-left' and b == 'top-right':
+                                    if c == 'bottom-left' and o == 'bottom-right':
+                                        score += 5
+                                if a == 'bottom-right' and b == 'bottom-left':
+                                    if c == 'top-right' and o == 'top-left':
+                                        score += 5
+                                if a == 'bottom-left' and b == 'bottom-right':
+                                    if c == 'top-left' and o == 'top-right':
                                         score += 5
 
         # C has A not - keep not change in opt
@@ -341,11 +360,7 @@ class Agent:
                             if key not in Obj_2.attributes:
                                 continue
                             elif Obj_1.attributes[key] == Obj_2.attributes[key]:
-                                # next round uncomment
-                                if key == 'shape': # shape weights most
-                                    n += 5
-                                else:
-                                    n += 1
+                                n += 1
                         if n>most:
                             most = n
                             most_2 = obj_2
@@ -371,11 +386,7 @@ class Agent:
                             if key not in Obj_2.attributes:
                                 continue
                             elif Obj_1.attributes[key] == Obj_2.attributes[key]:
-                                # next round uncomment
-                                if key == 'shape':
-                                    n += 5
-                                else:
-                                    n += 1
+                                n += 1
                         if n>most:
                             most = n
                             most_1 = obj_1
