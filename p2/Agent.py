@@ -24,6 +24,7 @@ class Agent:
     # main().
     def __init__(self):
         self.answers = []
+        self.threshold = 100
         pass
 
     # The primary method for solving incoming Raven's Progressive Matrices.
@@ -53,18 +54,28 @@ class Agent:
                 A = problem.figures['A']
                 B = problem.figures['B']
                 C = problem.figures['C']
-                im_A = Image.open(A.visualFilename)
-                im_B = Image.open(B.visualFilename)
-                im_C = Image.open(C.visualFilename)
+                im_A = Image.open(A.visualFilename).convert('L')
+                im_B = Image.open(B.visualFilename).convert('L')
+                im_C = Image.open(C.visualFilename).convert('L')
                 current_diff = float("inf")
                 choice = 0
+                print(problem.name)
+                if problem.name == "Basic Problem B-08":
+                    print(self.check_same(im_A, im_C))
+                    print(self.compute_diff(im_A, im_C))
                 for opt in self.answers:
                     option = problem.figures[opt]
-                    im_opt = Image.open(option.visualFilename)
+                    im_opt = Image.open(option.visualFilename).convert('L')
+                    if problem.name == "Basic Problem B-08":
+                        if opt == '6':
+                            print(self.check_same(im_B, im_opt))
+                            print(self.compute_diff(im_B, im_opt))
+
                     score = self.compute_score(im_A, im_B, im_C, im_opt)
                     if score > current_score:
                         current_score = score
                         current_ans = opt
+                    print(opt,": ",score)
                     if score == 0:
                         d_AB = self.compute_diff(im_A, im_B)
                         d_co = self.compute_diff(im_C, im_opt)
@@ -160,21 +171,35 @@ class Agent:
     def compute_score(self, A, B, C, option):
         score = 0
         if self.check_same(A, B) and self.check_same(C, option):
-            score += 2
+            score += 5
+            return score
         if self.check_same(A, C) and self.check_same(B, option):
-            score += 2
-        a = self.check_rotate(A, B)
-        if a>0 and a == self.check_rotate(C, option):
-            score += 1
-        b = self.check_rotate(A, C)
-        if b>0 and b == self.check_rotate(B, option):
-            score += 1
+            score += 5
+            return score
         c = self.check_mirror(A, B)
-        if c>0 and c == self.check_mirror(C, option):
-            score += 1
+        if c is not None:
+            cc = self.check_mirror(C, option)
+            if cc is not None and c == cc:
+                score += 2
+                return score
         d = self.check_mirror(A, C)
-        if d>0 and d == self.check_mirror(B, option):
-            score += 1
+        if d is not None:
+            dd = self.check_mirror(B, option)
+            if dd is not None and d == dd:
+                score += 2
+                return score
+        a = self.check_rotate(A, B)
+        if a is not None:
+            aa = self.check_rotate(C, option)
+            if aa is not None and a == aa:
+                score += 1
+                return score
+        b = self.check_rotate(A, C)
+        if b is not None:
+            bb = self.check_rotate(B, option)
+            if bb is not None and b == bb:
+                score += 1
+                return score
         return score
 
     def compute_score_3(self, A, B, C, D, E, F, G, H, option):
@@ -267,37 +292,57 @@ class Agent:
 
 
     def compute_diff(self, im_1, im_2):
-        h1 = im_1.histogram()
-        h2 = im_2.histogram()
-        diff = math.sqrt(reduce(operator.add, list(map(lambda a, b: (a - b) ** 2, h1, h2))) / len(h1))
+        i_1 = np.array(im_1)
+        i_1[i_1 < 255] = 0
+        i_2 = np.array(im_2)
+        i_2[i_2 < 255] = 0
+        # diff = np.linalg.norm(i_1 - i_2)  # Euclidean distance
+        diff = np.sum(i_1 != i_2)
         return diff
+
+    # turn image into np array and simplify it
+    def simplify(self, im):
+        a = np.array(im)
+        xlen = a.shape[0]
+        ylen = a.shape[1]
+        b = np.zeros((xlen, ylen))
+        for i in range(xlen):
+            for j in range(ylen):
+                for k in range(4):
+                    if a[i, j, k] != 255:
+                        b[i, j] = 1
+                        break
+        return b
 
     # compare images based on visual file
     def check_same(self, im_1, im_2):
         # 1 check same
-        diff = ImageChops.difference(im_1, im_2)
-        if diff.getbbox() is None:
-            return True  # same
+        diff = ImageChops.difference(im_1, im_2).getbbox()
+        if diff is None:
+            return True
         else:
             return False
 
     def check_rotate(self, im_1, im_2):
         # 2 check rotate
-        degree = [90, 180, 270]
+        degree = [45, 90, 135, 180, 225, 270]
         for d in degree:
-            new_1 = im_1.rotate(d)
-            if self.check_same(new_1, im_2):
+            new_1 = im_1.copy()
+            new_1 = new_1.rotate(d)
+            if self.compute_diff(new_1, im_2) < self.threshold:
                 return d  # rotate
-        return -1 # no rotate
+        return  # no rotate
 
     def check_mirror(self, im_1, im_2):
         # 2 check mirror
-        new_1 = im_1.transpose(Image.FLIP_LEFT_RIGHT)
-        if self.check_same(new_1, im_2):
-            return 1  # flip left right
-        new_1 = im_1.transpose(Image.FLIP_TOP_BOTTOM)
-        if self.check_same(new_1, im_2):
-            return 2  # flip top bottom
-        return -1  # no mirror
+        new_1 = im_1.copy()
+        new_1 = new_1.transpose(Image.FLIP_LEFT_RIGHT)
+        if self.compute_diff(new_1, im_2) < self.threshold:
+            return 'LR'  # flip left right
+        new_11 = im_1.copy()
+        new_11 = new_11.transpose(Image.FLIP_TOP_BOTTOM)
+        if self.compute_diff(new_11, im_2) < self.threshold:
+            return 'TB'  # flip top bottom
+        return  # no mirror
 
 
