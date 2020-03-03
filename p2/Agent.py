@@ -11,6 +11,8 @@
 # Install Pillow and uncomment this line to access image processing.
 from PIL import Image
 from PIL import ImageChops
+from PIL import ImageOps
+from PIL import ImageEnhance
 import operator
 import math
 from functools import reduce
@@ -24,7 +26,7 @@ class Agent:
     # main().
     def __init__(self):
         self.answers = []
-        self.threshold = 100
+        self.threshold = 461  # 461
         pass
 
     # The primary method for solving incoming Raven's Progressive Matrices.
@@ -54,37 +56,43 @@ class Agent:
                 A = problem.figures['A']
                 B = problem.figures['B']
                 C = problem.figures['C']
-                im_A = Image.open(A.visualFilename).convert('L')
-                im_B = Image.open(B.visualFilename).convert('L')
-                im_C = Image.open(C.visualFilename).convert('L')
-                current_diff = float("inf")
-                choice = 0
+                # invert black/white and convert to grey mode
+                im_A = self.open_pre(A)
+                im_B = self.open_pre(B)
+                im_C = self.open_pre(C)
+
                 print(problem.name)
-                if problem.name == "Basic Problem B-08":
-                    print(self.check_same(im_A, im_C))
-                    print(self.compute_diff(im_A, im_C))
+                if problem.name == "Basic Problem B-09":
+                    im_A.save('im_A.jpg')
+                    nd = self.im_to_np(im_A)
+                    np.savetxt("a.csv", nd, delimiter=',')
+                    aa = im_A.crop(im_A.getbbox())
+                    aa.save('aa.jpg')
+                    nda = self.im_to_np(aa)
+                    np.savetxt("aa.csv", nda, delimiter=',')
+                    bb = self.fill(im_A)
+                    bb.save('bb.jpg')
+                    fill_A = self.fill(im_A)
+                    print(self.check_same(fill_A, im_C))
+                    print(self.compute_diff(fill_A, im_C))
+                    print(np.array(im_C))
+
                 for opt in self.answers:
                     option = problem.figures[opt]
-                    im_opt = Image.open(option.visualFilename).convert('L')
-                    if problem.name == "Basic Problem B-08":
-                        if opt == '6':
-                            print(self.check_same(im_B, im_opt))
-                            print(self.compute_diff(im_B, im_opt))
+                    im_opt = self.open_pre(option)
+
+                    if problem.name == "Basic Problem B-09":
+                        if opt == '5':
+                            cc = self.fill(im_C)
+                            cc.save('cc.jpg')
+                            print(self.check_same(cc, im_opt))
+                            print(self.compute_diff(cc, im_opt))
 
                     score = self.compute_score(im_A, im_B, im_C, im_opt)
                     if score > current_score:
                         current_score = score
                         current_ans = opt
                     print(opt,": ",score)
-                    if score == 0:
-                        d_AB = self.compute_diff(im_A, im_B)
-                        d_co = self.compute_diff(im_C, im_opt)
-                        d = abs(d_AB-d_co)
-                        if d < current_diff:
-                            current_diff = d
-                            choice = opt
-                if current_ans == -1:
-                    current_ans = choice
                 return int(current_ans)
             else: # 3x3
                 # A B C
@@ -98,6 +106,25 @@ class Agent:
                 F = problem.figures['F']
                 G = problem.figures['G']
                 H = problem.figures['H']
+                im_A = self.open_pre(A)
+                im_B = self.open_pre(B)
+                im_C = self.open_pre(C)
+                im_D = self.open_pre(D)
+                im_E = self.open_pre(E)
+                im_F = self.open_pre(F)
+                im_G = self.open_pre(G)
+                im_H = self.open_pre(H)
+                for opt in self.answers:
+                    option = problem.figures[opt]
+                    im_opt = self.open_pre(option)
+
+                    score = self.compute_score(im_A, im_C, im_G, im_opt)
+                    if score > current_score:
+                        current_score = score
+                        current_ans = opt
+                    print(opt, ": ", score)
+                return int(current_ans)
+
         return -1
 
     # exclude options by number of objects
@@ -166,162 +193,129 @@ class Agent:
                         del self.answers[j]
                         break
 
+
+
     # pair objects from different figure using the same key. The name is
     # based on dic_1 so the key of dic_2 will be updated
     def compute_score(self, A, B, C, option):
-        score = 0
+        same_score = 10
+        mirror_score = 8
+        rotate_score = 6
+        fill_score = 4
         if self.check_same(A, B) and self.check_same(C, option):
-            score += 5
-            return score
+            return same_score
         if self.check_same(A, C) and self.check_same(B, option):
-            score += 5
-            return score
+            return same_score
         c = self.check_mirror(A, B)
         if c is not None:
             cc = self.check_mirror(C, option)
             if cc is not None and c == cc:
-                score += 2
-                return score
+                return mirror_score
         d = self.check_mirror(A, C)
         if d is not None:
             dd = self.check_mirror(B, option)
             if dd is not None and d == dd:
-                score += 2
-                return score
+                return mirror_score
         a = self.check_rotate(A, B)
         if a is not None:
             aa = self.check_rotate(C, option)
             if aa is not None and a == aa:
-                score += 1
-                return score
+                return rotate_score
         b = self.check_rotate(A, C)
         if b is not None:
             bb = self.check_rotate(B, option)
             if bb is not None and b == bb:
+                return rotate_score
+
+        # check fill
+        a_fill = self.fill(A)
+        b_fill = self.fill(B)
+        c_fill = self.fill(C)
+        o_fill = self.fill(option)
+        # A filled to B
+        if self.check_same(a_fill, B):
+            if self.check_same(c_fill, option):
+                return fill_score
+        # A filled to C
+        if self.check_same(a_fill, C):
+            if self.check_same(b_fill, option):
+                return fill_score
+        # B filled to A
+        if self.check_same(b_fill, A):
+            if self.check_same(o_fill, C):
+                return fill_score
+        # C filled to A
+        if self.check_same(c_fill, A):
+            if self.check_same(o_fill, B):
+                return fill_score
+
+        score = 0
+        # check if diff is the same
+        # A - B == C - option
+        diff_ab = ImageChops.difference(A, B)
+        diff_co = ImageChops.difference(C, option)
+        if diff_ab is not None and diff_co is not None:
+            if self.check_same(diff_ab, diff_co):
                 score += 1
-                return score
+        # A - C == B - option
+        diff_ac = ImageChops.difference(A, C)
+        diff_bo = ImageChops.difference(B, option)
+        if diff_ac is not None and diff_bo is not None:
+            if self.check_same(diff_ac, diff_bo):
+                score += 1
         return score
 
     def compute_score_3(self, A, B, C, D, E, F, G, H, option):
         score = 0
-        if len(C.objects) > len(B.objects) > len(A.objects):
-            pairs_cb = self.pair_objects(C, B)
-            pairs_ba = self.pair_objects(B, A)
-            for name_c in pairs_cb:
-                name_b = pairs_cb[name_c]
-
-        pairs_ab = self.pair_objects(A, B)
-        pairs_bc = self.pair_objects(B, C)
-        pairs_ad = self.pair_objects(A, D)
-        pairs_dg = self.pair_objects(D, G)
-        pairs_gh = self.pair_objects(G, H)
-        pairs_ho = self.pair_objects(H, option)
-        for name_a in pairs_ab:
-            obj_a = A.objects[name_a]
-            name_b = pairs_ab[name_a]
-            if name_c=='':
-                pass
+        score += self.compute_score(A, C, G, option)
         return score
 
 
-    # Link objects from f2 to f1
-    def pair_objects(self, f1, f2): # return obj_name_1:obj_name_2 pairs. f1>=f2?
-        # f1 should have equal or more objects than f2?
-        # return directly if there is only one object in each figure
-        pairs = {}  # obj_1:obj_2
-        if len(f1.objects) == len(f2.objects) == 1:
-            pairs[list(f1.objects.keys())[0]] = list(f2.objects.keys())[0]
-        # link the objects which have the most same attributes
+    # open and pre deal with image
+    @staticmethod
+    def open_pre(im):
+        # invert black/white and convert to grey mode
+        im_grey = Image.open(im.visualFilename).convert('L')
 
-        if len(f1.objects)<=len(f2.objects):
-            objects_2 = f2.objects.copy()
-            for obj_1 in f1.objects:
-                Obj_1 = f1.objects[obj_1]
-                n = 0 # num of same attributes
-                most = 0
-                most_2 = '' # name of obj_2 which has the most same attributes with obj_1
-                if len(objects_2)==0:
-                    print('error')
-                if len(objects_2)==1:
-                    most_2 = list(objects_2.keys())[0]
-                else:
-                    for obj_2 in objects_2:
-                        Obj_2 = objects_2[obj_2]
-                        for key in Obj_1.attributes:
-                            if key not in Obj_2.attributes:
-                                continue
-                            elif Obj_1.attributes[key] == Obj_2.attributes[key]:
-                                n += 1
-                        if n>most:
-                            most = n
-                            most_2 = obj_2
-                pairs[obj_1] = most_2
-                if most_2 != '':
-                    del objects_2[most_2]
-        else:
-            re_pairs = {} # obj_2:obj_1
-            objects_1 = f1.objects.copy()
-            for obj_2 in f2.objects:
-                Obj_2 = f2.objects[obj_2]
-                n = 0 # match score - next round consider
-                most = 0
-                most_1 = '' # name of obj_2 which has the most same attributes with obj_1
-                if len(objects_1)==0:
-                    print('error')
-                if len(objects_1)==1:
-                    most_1 = list(objects_1.keys())[0]
-                else:
-                    for obj_1 in objects_1:
-                        Obj_1 = objects_1[obj_1]
-                        for key in Obj_1.attributes:
-                            if key not in Obj_2.attributes:
-                                continue
-                            elif Obj_1.attributes[key] == Obj_2.attributes[key]:
-                                n += 1
-                        if n>most:
-                            most = n
-                            most_1 = obj_1
-                re_pairs[obj_2] = most_1
-            pairs = {value: key for key, value in re_pairs.items()}
-            names = list(pairs.keys())
-            for name_1 in list(f1.objects.keys()):
-                # name_1 in f1 is deleted in f2
-                if name_1 not in names:
-                    pairs[name_1]=''
-        return pairs
+        enh_con = ImageEnhance.Contrast(im_grey)
+        contrast = 1.5
+        img_contrasted = enh_con.enhance(contrast)
 
+        im_r = ImageOps.invert(img_contrasted)
+        # nd = Agent.im_to_np(im_r)
+        # im_a = Image.fromarray(np.uint8(nd))
+        return im_r
 
-    def compute_diff(self, im_1, im_2):
-        i_1 = np.array(im_1)
-        i_1[i_1 < 255] = 0
-        i_2 = np.array(im_2)
-        i_2[i_2 < 255] = 0
+    @staticmethod
+    def im_to_np(im):
+        i = np.array(im)
+        # i[i >= 10] = 255  # white
+        i[i < 255] = 0  # black
+        return i
+
+    @staticmethod
+    def compute_diff(im_1, im_2):
+        i_1 = Agent.im_to_np(im_1)
+        i_2 = Agent.im_to_np(im_2)
         # diff = np.linalg.norm(i_1 - i_2)  # Euclidean distance
-        diff = np.sum(i_1 != i_2)
+        # diff = np.sum(abs(i_1-i_2) > 60)
+        diff = np.sum(i_1!=i_2)
         return diff
 
-    # turn image into np array and simplify it
-    def simplify(self, im):
-        a = np.array(im)
-        xlen = a.shape[0]
-        ylen = a.shape[1]
-        b = np.zeros((xlen, ylen))
-        for i in range(xlen):
-            for j in range(ylen):
-                for k in range(4):
-                    if a[i, j, k] != 255:
-                        b[i, j] = 1
-                        break
-        return b
-
     # compare images based on visual file
-    def check_same(self, im_1, im_2):
+    @staticmethod
+    def check_same(im_1, im_2):
         # 1 check same
         diff = ImageChops.difference(im_1, im_2).getbbox()
         if diff is None:
             return True
         else:
             return False
+        '''
+        if self.compute_diff(im_1, im_2) < self.threshold:
+            return True
+        return False
+        '''
 
     def check_rotate(self, im_1, im_2):
         # 2 check rotate
@@ -345,4 +339,33 @@ class Agent:
             return 'TB'  # flip top bottom
         return  # no mirror
 
+    def check_fill(self, im_1, im_2):
+        diff = ImageChops.difference(im_1, im_2)
+        i1 = self.im_to_np(im_1)
+        i_1 = Image.fromarray(np.uint8(i1))
+        i2 = self.im_to_np(im_2)
+        i_2 = Image.fromarray(np.uint8(i2))
+        i3 = np.zeros(i1.shape)
+        if i_1.getbbox() == i_2.getbbox():
+            i3[i1 == 249] = 249
+            i3[i2 == 249] = 249
+            if self.compute_diff(i2, i3) < 1:
+                return True
+        return False
+
+    def fill(self, im):
+        fp = self.im_to_np(im)
+        fill = False
+        for i in range(fp.shape[0]):
+            for j in range(5, fp.shape[1]-5):
+                if fp[i, j-5] == 0 and  fp[i, j-1] == 255 and fp[i, j] == 0 and fill == False:
+                    fill = True  # fp[i, j] is inside shape
+                if fp[i, j + 5] == 0 and fp[i, j + 1] == 255 and fp[i, j] == 0 and fill == True:
+                    fill = False
+                    fp[i, j] = 255
+                    break
+                if fill:
+                    fp[i, j] = 255
+        filled = Image.fromarray(np.uint8(fp))
+        return filled
 
