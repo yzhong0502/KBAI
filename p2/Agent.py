@@ -27,7 +27,6 @@ class Agent:
     def __init__(self):
         self.answers = []
         self.threshold = 461  # 461
-        pass
 
     # The primary method for solving incoming Raven's Progressive Matrices.
     # For each problem, your Agent's Solve() method will be called. At the
@@ -44,7 +43,7 @@ class Agent:
             self.answers = ['1', '2', '3', '4', '5', '6']
         else:
             self.answers = ['1', '2', '3', '4', '5', '6', '7', '8']
-        # check if the problem has verbal representation
+
         if problem.hasVisual:
             # check the figures one by one depending on its problem type
             # get Ravens objects from each figure
@@ -61,38 +60,14 @@ class Agent:
                 im_B = self.open_pre(B)
                 im_C = self.open_pre(C)
 
-                print(problem.name)
-                if problem.name == "Basic Problem B-09":
-                    im_A.save('im_A.jpg')
-                    nd = self.im_to_np(im_A)
-                    np.savetxt("a.csv", nd, delimiter=',')
-                    aa = im_A.crop(im_A.getbbox())
-                    aa.save('aa.jpg')
-                    nda = self.im_to_np(aa)
-                    np.savetxt("aa.csv", nda, delimiter=',')
-                    bb = self.fill(im_A)
-                    bb.save('bb.jpg')
-                    fill_A = self.fill(im_A)
-                    print(self.check_same(fill_A, im_C))
-                    print(self.compute_diff(fill_A, im_C))
-                    print(np.array(im_C))
 
                 for opt in self.answers:
                     option = problem.figures[opt]
                     im_opt = self.open_pre(option)
-
-                    if problem.name == "Basic Problem B-09":
-                        if opt == '5':
-                            cc = self.fill(im_C)
-                            cc.save('cc.jpg')
-                            print(self.check_same(cc, im_opt))
-                            print(self.compute_diff(cc, im_opt))
-
                     score = self.compute_score(im_A, im_B, im_C, im_opt)
                     if score > current_score:
                         current_score = score
                         current_ans = opt
-                    print(opt,": ",score)
                 return int(current_ans)
             else: # 3x3
                 # A B C
@@ -114,11 +89,40 @@ class Agent:
                 im_F = self.open_pre(F)
                 im_G = self.open_pre(G)
                 im_H = self.open_pre(H)
+
+                print(problem.name)
+
+                # deal with C-06
+                a = im_A.getbbox()
+                if a == None:
+                    a = (0, 0, 0, 0)
+                b = im_B.getbbox()
+                c = im_C.getbbox()
+                d = im_D.getbbox()
+                g = im_G.getbbox()
+                if problem.name == "Basic Problem C-06":
+                    print(a)
+                    print(b)
+                    print(c)
+                    print(d)
+                    print(g)
+                xy = None
+                if b != None and c != None and d != None and g != None:
+                    if a[1]==b[1]==c[1] and a[3]==b[3]==c[3] and abs((b[2]-b[0])-(a[2]-a[0])*2)<3 and abs((c[2]-c[0])-(a[2]-a[0])*3)<3:
+                        if a[0]==d[0]==g[0] and a[2]==d[2]==g[2] and abs((d[3]-d[1])-(a[3]-a[1])*2)<3 and abs((g[3]-g[1])-(a[3]-a[1])*3)<3:
+                            xy = (c[0],g[1],c[2],g[3])
+
                 for opt in self.answers:
                     option = problem.figures[opt]
                     im_opt = self.open_pre(option)
-
                     score = self.compute_score(im_A, im_C, im_G, im_opt)
+
+                    # C-06
+                    if xy is not None:
+                        o = im_opt.getbbox()
+                        if o == xy:
+                            score += 1
+
                     if score > current_score:
                         current_score = score
                         current_ans = opt
@@ -201,7 +205,6 @@ class Agent:
         same_score = 10
         mirror_score = 8
         rotate_score = 6
-        fill_score = 4
         if self.check_same(A, B) and self.check_same(C, option):
             return same_score
         if self.check_same(A, C) and self.check_same(B, option):
@@ -226,49 +229,8 @@ class Agent:
             bb = self.check_rotate(B, option)
             if bb is not None and b == bb:
                 return rotate_score
+        return 0
 
-        # check fill
-        a_fill = self.fill(A)
-        b_fill = self.fill(B)
-        c_fill = self.fill(C)
-        o_fill = self.fill(option)
-        # A filled to B
-        if self.check_same(a_fill, B):
-            if self.check_same(c_fill, option):
-                return fill_score
-        # A filled to C
-        if self.check_same(a_fill, C):
-            if self.check_same(b_fill, option):
-                return fill_score
-        # B filled to A
-        if self.check_same(b_fill, A):
-            if self.check_same(o_fill, C):
-                return fill_score
-        # C filled to A
-        if self.check_same(c_fill, A):
-            if self.check_same(o_fill, B):
-                return fill_score
-
-        score = 0
-        # check if diff is the same
-        # A - B == C - option
-        diff_ab = ImageChops.difference(A, B)
-        diff_co = ImageChops.difference(C, option)
-        if diff_ab is not None and diff_co is not None:
-            if self.check_same(diff_ab, diff_co):
-                score += 1
-        # A - C == B - option
-        diff_ac = ImageChops.difference(A, C)
-        diff_bo = ImageChops.difference(B, option)
-        if diff_ac is not None and diff_bo is not None:
-            if self.check_same(diff_ac, diff_bo):
-                score += 1
-        return score
-
-    def compute_score_3(self, A, B, C, D, E, F, G, H, option):
-        score = 0
-        score += self.compute_score(A, C, G, option)
-        return score
 
 
     # open and pre deal with image
@@ -282,9 +244,9 @@ class Agent:
         img_contrasted = enh_con.enhance(contrast)
 
         im_r = ImageOps.invert(img_contrasted)
-        # nd = Agent.im_to_np(im_r)
-        # im_a = Image.fromarray(np.uint8(nd))
-        return im_r
+        nd = Agent.im_to_np(im_r)
+        im_a = Image.fromarray(np.uint8(nd))
+        return im_a
 
     @staticmethod
     def im_to_np(im):
@@ -339,33 +301,4 @@ class Agent:
             return 'TB'  # flip top bottom
         return  # no mirror
 
-    def check_fill(self, im_1, im_2):
-        diff = ImageChops.difference(im_1, im_2)
-        i1 = self.im_to_np(im_1)
-        i_1 = Image.fromarray(np.uint8(i1))
-        i2 = self.im_to_np(im_2)
-        i_2 = Image.fromarray(np.uint8(i2))
-        i3 = np.zeros(i1.shape)
-        if i_1.getbbox() == i_2.getbbox():
-            i3[i1 == 249] = 249
-            i3[i2 == 249] = 249
-            if self.compute_diff(i2, i3) < 1:
-                return True
-        return False
-
-    def fill(self, im):
-        fp = self.im_to_np(im)
-        fill = False
-        for i in range(fp.shape[0]):
-            for j in range(5, fp.shape[1]-5):
-                if fp[i, j-5] == 0 and  fp[i, j-1] == 255 and fp[i, j] == 0 and fill == False:
-                    fill = True  # fp[i, j] is inside shape
-                if fp[i, j + 5] == 0 and fp[i, j + 1] == 255 and fp[i, j] == 0 and fill == True:
-                    fill = False
-                    fp[i, j] = 255
-                    break
-                if fill:
-                    fp[i, j] = 255
-        filled = Image.fromarray(np.uint8(fp))
-        return filled
 
