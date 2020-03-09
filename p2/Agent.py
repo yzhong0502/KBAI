@@ -92,35 +92,67 @@ class Agent:
 
                 print(problem.name)
 
-                # deal with C-06
+                # deal with C-04, C-06 & C-10
                 a = im_A.getbbox()
                 if a == None:
                     a = (0, 0, 0, 0)
                 b = im_B.getbbox()
                 c = im_C.getbbox()
                 d = im_D.getbbox()
+                e = im_E.getbbox()
+                f = im_F.getbbox()
                 g = im_G.getbbox()
-                if problem.name == "Basic Problem C-06":
+                h = im_H.getbbox()
+                if problem.name == "Basic Problem C-10":
                     print(a)
                     print(b)
                     print(c)
                     print(d)
+                    print(e)
+                    print(f)
                     print(g)
-                xy = None
-                if b != None and c != None and d != None and g != None:
-                    if a[1]==b[1]==c[1] and a[3]==b[3]==c[3] and abs((b[2]-b[0])-(a[2]-a[0])*2)<3 and abs((c[2]-c[0])-(a[2]-a[0])*3)<3:
-                        if a[0]==d[0]==g[0] and a[2]==d[2]==g[2] and abs((d[3]-d[1])-(a[3]-a[1])*2)<3 and abs((g[3]-g[1])-(a[3]-a[1])*3)<3:
-                            xy = (c[0],g[1],c[2],g[3])
+                    print(h)
+
+                x,y = 0,0
+                if b != None and c != None and d != None and e != None and f != None and g != None and h != None:
+                    ax = a[2]-a[0]
+                    ay = a[3]-a[1]
+                    bx = b[2] - b[0]
+                    by = b[3] - b[1]
+                    cx = c[2] - c[0]
+                    cy = c[3] - c[1]
+                    dx = d[2] - d[0]
+                    dy = d[3] - d[1]
+                    ex = e[2] - e[0]
+                    ey = e[3] - e[1]
+                    fx = f[2] - f[0]
+                    fy = f[3] - f[1]
+                    gx = g[2] - g[0]
+                    gy = g[3] - g[1]
+                    hx = h[2] - h[0]
+                    hy = h[3] - h[1]
+                    if abs(by-ay)<3 and abs(cy-by)<3 and ax!=bx!=cx:
+                        if abs(dx-ax)<3 and abs(gx-dx)<3 and ay!=dy!=gy:
+                            if abs(dy-ey)<3 and abs(fy-ey)<3 and dx!=ex!=fx:
+                                if abs(bx-ex)<3 and abs(hx-ex)<3 and by!=ey!=hy:
+                                    if abs(gy-hy)<3 and gx!=hx:
+                                        if abs(cx-fx)<3 and cy!=fy:
+                                            x = cx
+                                            y = gy
 
                 for opt in self.answers:
                     option = problem.figures[opt]
                     im_opt = self.open_pre(option)
                     score = self.compute_score(im_A, im_C, im_G, im_opt)
 
-                    # C-06
-                    if xy is not None:
+                    # C-04, C-06 & C-10
+                    if x!=0 and y!=0:
                         o = im_opt.getbbox()
-                        if o == xy:
+                        if opt == '7':
+                            print(o)
+                        ox = o[2]-o[0]
+                        oy = o[3]-o[1]
+                        if abs(ox-x)<5 and abs(oy-y)<5:
                             score += 1
 
                     if score > current_score:
@@ -301,4 +333,5 @@ class Agent:
             return 'TB'  # flip top bottom
         return  # no mirror
 
+    # try PIL.image.paste or numpy.roll to detect offset
 
